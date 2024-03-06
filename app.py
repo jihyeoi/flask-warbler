@@ -5,7 +5,7 @@ from flask import Flask, render_template, request, flash, redirect, session, g
 from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 
-from forms import UserAddForm, LoginForm, MessageForm
+from forms import UserAddForm, LoginForm, MessageForm, CsrfForm
 from models import db, connect_db, User, Message
 
 load_dotenv()
@@ -51,6 +51,7 @@ def do_logout():
         del session[CURR_USER_KEY]
 
 
+
 @app.route('/signup', methods=["GET", "POST"])
 def signup():
     """Handle user signup.
@@ -67,8 +68,6 @@ def signup():
 
     form = UserAddForm()
 
-    breakpoint()
-
     if form.validate_on_submit():
         try:
             user = User.signup(
@@ -77,6 +76,7 @@ def signup():
                 email=form.email.data,
                 image_url=form.image_url.data or User.image_url.default.arg,
             )
+            #TODO: db.session.add(user)?
             db.session.commit()
 
         except IntegrityError:
@@ -119,8 +119,13 @@ def logout():
 
     form = g.csrf_form
 
-    # IMPLEMENT THIS AND FIX BUG
-    # DO NOT CHANGE METHOD ON ROUTE
+    #TODO: ask difference form = CsrfForm()
+
+    if form.validate_on_submit():
+        do_logout()
+        flash("User Logged Out")
+
+    return redirect("/login")
 
 
 ##############################################################################
