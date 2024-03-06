@@ -34,6 +34,7 @@ def add_user_to_g():
 
     if CURR_USER_KEY in session:
         g.user = User.query.get(session[CURR_USER_KEY])
+        g.csrf_form = CsrfForm()
 
     else:
         g.user = None
@@ -118,9 +119,9 @@ def login():
 def logout():
     """Handle logout of user and redirect to homepage."""
 
-    form = CsrfForm()
+    #form = CsrfForm()
 
-    #TODO: ask difference about form = g.csrf_form VS form = CsrfForm()
+    form = g.csrf_form
 
     if form.validate_on_submit():
         do_logout()
@@ -157,15 +158,13 @@ def list_users():
 def show_user(user_id):
     """Show user profile."""
 
-    form = CsrfForm()
-
     if not g.user:
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
     user = User.query.get_or_404(user_id)
 
-    return render_template('users/show.html', user=user, form=form)
+    return render_template('users/show.html', user=user, form=g.csrf_form)
 
 
 @app.get('/users/<int:user_id>/following')
@@ -247,12 +246,11 @@ def profile():
     """Update profile for current user."""
 
     # TODO: not completed
-    
+    form = g.csrf_form
+
     if not g.user:
         flash("Access unauthorized.", "danger")
         return redirect("/")
-
-    form = CsrfForm()
 
     if form.validate_on_submit():
         redirect(url_for())
@@ -269,11 +267,11 @@ def delete_user():
     Redirect to signup page.
     """
 
+    form = g.csrf_form
+
     if not g.user:
         flash("Access unauthorized.", "danger")
         return redirect("/")
-
-    form = CsrfForm()
 
     if form.validate_on_submit():
         do_logout()
@@ -338,7 +336,7 @@ def delete_message(message_id):
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
-    form = CsrfForm()
+    form = g.csrf_form
 
     if form.validate_on_submit():
         db.session.delete(msg)
@@ -363,7 +361,7 @@ def homepage():
     """
 
     if g.user:
-        form = CsrfForm()
+        form = g.csrf_form
 
         messages = (Message
                     .query
