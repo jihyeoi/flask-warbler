@@ -1,12 +1,12 @@
 import os
 from dotenv import load_dotenv
 
-from flask import Flask, render_template, request, flash, redirect, session, g
+from flask import Flask, render_template, request, flash, redirect, session, g, url_for
 from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 from werkzeug.exceptions import Unauthorized
 
-from forms import UserAddForm, LoginForm, MessageForm, CsrfForm
+from forms import UserAddForm, LoginForm, MessageForm, CsrfForm, EditForm
 from models import db, connect_db, User, Message
 
 load_dotenv()
@@ -243,19 +243,30 @@ def stop_following(follow_id):
 def profile():
     """Update profile for current user."""
 
-    # TODO: not completed
-    form = g.csrf_form
+    user = User.query.get_or_404(g.user.id)
+    form = EditForm(obj=user)
 
     if not g.user:
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
     if form.validate_on_submit():
-        redirect(url_for())
-    else:
-        return render_template("detail.html",
-                               user=g.user,
-                               form=form)
+        user.username = form.username.data
+        user.email = form.email.data
+        user.image_url = form.image_url.data
+        user.header_image_url = form.header_image_url.data
+        user.bio = form.bio.data
+        password = form.password.data
+
+        edit_user = User.authenticate(user.username, password)
+        db.session.commit()
+
+        if edit_user:
+            return redirect(f"/users/{user.id}")
+        else:
+            form.password.errors = ["Bad Password"]
+
+    return render_template('/users/edit.html', user=user, form=form)
 
 
 @app.post('/users/delete')
