@@ -119,8 +119,6 @@ def login():
 def logout():
     """Handle logout of user and redirect to homepage."""
 
-    #form = CsrfForm()
-
     form = g.csrf_form
 
     if form.validate_on_submit():
@@ -151,7 +149,7 @@ def list_users():
     else:
         users = User.query.filter(User.username.like(f"%{search}%")).all()
 
-    return render_template('users/index.html', users=users)
+    return render_template('users/index.html', users=users, form=g.csrf_form)
 
 
 @app.get('/users/<int:user_id>')
@@ -179,7 +177,7 @@ def show_following(user_id):
 
     user = User.query.get_or_404(user_id)
 
-    return render_template('users/following.html', user=user)
+    return render_template('users/following.html', user=user, form=g.csrf_form)
 
 
 @app.get('/users/<int:user_id>/followers')
@@ -191,7 +189,7 @@ def show_followers(user_id):
         return redirect("/")
 
     user = User.query.get_or_404(user_id)
-    return render_template('users/followers.html', user=user)
+    return render_template('users/followers.html', user=user, form=g.csrf_form)
 
 
 @app.post('/users/follow/<int:follow_id>')
@@ -205,7 +203,7 @@ def start_following(follow_id):
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
-    form = CsrfForm()
+    form=g.csrf_form
 
     if form.validate_on_submit():
         followed_user = User.query.get_or_404(follow_id)
@@ -228,7 +226,7 @@ def stop_following(follow_id):
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
-    form = CsrfForm()
+    form=g.csrf_form
 
     if form.validate_on_submit():
         followed_user = User.query.get_or_404(follow_id)
@@ -274,10 +272,12 @@ def delete_user():
         return redirect("/")
 
     if form.validate_on_submit():
-        do_logout()
+        user = User.query.get_or_404(g.user.id)
 
-        db.session.delete(g.user)
+        db.session.delete(user)
         db.session.commit()
+
+        do_logout()
 
         return redirect("/signup")
 
