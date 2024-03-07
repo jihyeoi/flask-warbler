@@ -5,6 +5,7 @@ from flask import Flask, render_template, request, flash, redirect, session, g
 from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 from werkzeug.exceptions import Unauthorized
+from bs4 import BeautifulSoup
 
 from forms import UserAddForm, LoginForm, MessageForm, CsrfForm, EditForm
 from models import db, connect_db, User, Message, DEFAULT_IMAGE_URL, DEFAULT_HEADER_IMAGE_URL
@@ -17,7 +18,7 @@ app = Flask(__name__)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL']
 app.config['SQLALCHEMY_ECHO'] = False
-app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
+app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = True
 app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
 toolbar = DebugToolbarExtension(app)
 
@@ -343,6 +344,27 @@ def delete_message(message_id):
         raise Unauthorized()
 
 
+@app.post("/message/<int:message_id>/favorite")
+def handle_favorites(message_id):
+    """handle the favoriting/unfavoriting of a function"""
+
+    if not g.user or not g.csrf.form.validate_on_submit():
+        return redirect #TODO: redirect to whatever page they clicked from
+
+    msg = Message.query.get_or_404(message_id)
+
+    if msg not in g.user.liked_messages:
+        g.user.liked_message.append(msg)
+        db.session.commit()
+        # TODO: update favorites icon to filled star using bSoup toggle bi-star / bi-star-fill
+    else:
+        g.user.liked_message.pop(msg)
+        db.session.commit()
+        # TODO: update favorites icon to filled star using bSoup toggle bi-star / bi-star-fill
+
+    return redirect #TODO: redirect to whatever page they clicked from
+
+
 ##############################################################################
 # Homepage and error pages
 
@@ -369,30 +391,6 @@ def homepage():
                                messages=messages)
 
     return render_template('home-anon.html')
-
-
-@app.post("/favorite")
-def handle_favorites():
-    """handle the favoriting/unfavoriting of a function"""
-
-    if not g.user or not g.csrf.form.validate_on_submit():
-        return redirect #redirect to whatever page they clicked from
-
-    if: # message is not my warble or not in my likes
-        g.user.liked_message.append() # add message id)
-        db.session.commit()
-        # update favorites icon to filled star
-        # https://icons.getbootstrap.com/icons/star-fill/
-    else:
-        g.user.liked_message.pop() # add message id)
-        db.session.commit()
-        # update favorites icon to empty star
-        # https://icons.getbootstrap.com/icons/star/
-
-    return redirect #redirect to whatever page they clicked from
-
-
-
 
 
 @app.after_request
