@@ -29,8 +29,8 @@ connect_db(app)
 
 
 @app.before_request
-def add_user_to_g():
-    """If we're logged in, add curr user to Flask global."""
+def add_user_and_csrf_to_g():
+    """If we're logged in, add curr user and csrf form to Flask global."""
 
     if CURR_USER_KEY in session:
         g.user = User.query.get(session[CURR_USER_KEY])
@@ -77,7 +77,6 @@ def signup():
                 email=form.email.data,
                 image_url=form.image_url.data or User.image_url.default.arg,
             )
-            # TODO: db.session.add(user)?
             db.session.commit()
 
         except IntegrityError:
@@ -118,9 +117,7 @@ def login():
 def logout():
     """Handle logout of user and redirect to homepage."""
 
-    form = g.csrf_form
-
-    if form.validate_on_submit():
+    if g.csrf_form.validate_on_submit():
         do_logout()
         flash("User Logged Out")
 
@@ -196,22 +193,20 @@ def start_following(follow_id):
     Redirect to following page for the current for the current user.
     """
 
-    if not g.user:
+    if not g.user or not g.csrf_form.validate_on_submit():
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
-    form = g.csrf_form
+    followed_user = User.query.get_or_404(follow_id)
 
-    #TODO: refactor all the raise errors
-    if form.validate_on_submit():
-        followed_user = User.query.get_or_404(follow_id)
-        g.user.following.append(followed_user)
-        db.session.commit()
+    if followed_user == g.user:
+        flash("You can not follow yourself.", "danger")
+        return redirect("/users")
 
-        return redirect(f"/users/{g.user.id}/following")
+    g.user.following.append(followed_user)
+    db.session.commit()
 
-    else:
-        raise Unauthorized()
+    return redirect(f"/users/{g.user.id}/following")
 
 
 @app.post('/users/stop-following/<int:follow_id>')
@@ -221,59 +216,49 @@ def stop_following(follow_id):
     Redirect to following page for the current for the current user.
     """
 
-    if not g.user:
+    if not g.user or not g.csrf_form.validate_on_submit():
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
-    form = g.csrf_form
-    #TODO: refactor all the raise errors
+    followed_user = User.query.get_or_404(follow_id)
+    g.user.following.remove(followed_user)
+    db.session.commit()
 
-    if form.validate_on_submit():
-        followed_user = User.query.get_or_404(follow_id)
-        g.user.following.remove(followed_user)
-        db.session.commit()
-
-        return redirect(f"/users/{g.user.id}/following")
-
-    else:
-        raise Unauthorized()
+    return redirect(f"/users/{g.user.id}/following")
 
 
 @app.route('/users/profile', methods=["GET", "POST"])
 def profile():
     """Update profile for current user."""
 
-    user = User.query.get_or_404(g.user.id)
-    form = EditForm(obj=user)
+    form = EditForm(obj=g.user)
 
     if not g.user:
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
     if form.validate_on_submit():
-        user.username = form.username.data
-        user.email = form.email.data
-        user.image_url = form.image_url.data or DEFAULT_IMAGE_URL
-        user.header_image_url = form.header_image_url.data or DEFAULT_HEADER_IMAGE_URL
-        user.bio = form.bio.data or " "
-        password = form.password.data
-
-        edit_user = User.authenticate(user.username, password)
-
-    #FIXME: try except block for integrity error not working - still showing traceback integrity error page upon error raising
-        try:
-            db.session.commit()
-
-        except IntegrityError:
-            form.username.errors = ["Username Taken"]
-            return render_template('/users/edit.html', user=user, form=form)
+        edit_user = User.authenticate(g.user.username, form.password.data)
 
         if edit_user:
-            return redirect(f"/users/{user.id}")
+            g.user.username = form.username.data
+            g.user.email = form.email.data
+            g.user.image_url = form.image_url.data or DEFAULT_IMAGE_URL
+            g.user.header_image_url = form.header_image_url.data or DEFAULT_HEADER_IMAGE_URL
+            g.user.bio = form.bio.data or " "
+
+            try:
+                db.session.commit()
+                return redirect(f"/users/{g.user.id}")
+
+            except IntegrityError:
+                db.session.rollback()
+                form.username.errors = ["Username Already Taken"]
+
         else:
             form.password.errors = ["Bad Password"]
 
-    return render_template('/users/edit.html', user=user, form=form)
+    return render_template('/users/edit.html', user=g.user, form=form)
 
 
 @app.post('/users/delete')
@@ -287,17 +272,14 @@ def delete_user():
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
-    user = User.query.get_or_404(g.user.id)
+    # cascade kicks in here so no need to delete messages separately (must have delete cascade in models though!)
+    User.query.filter_by(id = g.user.id).delete()
 
-    user.query.filter(User.messages).delete()
-
-    db.session.delete(user)
     db.session.commit()
 
     do_logout()
 
     return redirect("/signup")
-
 
 
 ##############################################################################
@@ -347,7 +329,7 @@ def delete_message(message_id):
     """
     msg = Message.query.get_or_404(message_id)
 
-    if not g.user or msg.user_id != g.user.id:
+    if not g.user or (msg.user_id != g.user.id):
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
@@ -374,12 +356,11 @@ def homepage():
     """
 
     if g.user:
-
-        following_ids = [person.id for person in g.user.following]
+        following_ids = [user.id for user in g.user.following] + [g.user.id]
 
         messages = (Message
                     .query
-                    .filter((Message.user_id == g.user.id) | (Message.user_id.in_(following_ids)))
+                    .filter(Message.user_id.in_(following_ids))
                     .order_by(Message.timestamp.desc())
                     .limit(100)
                     .all())
