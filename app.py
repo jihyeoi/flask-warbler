@@ -374,8 +374,11 @@ def homepage():
     if g.user:
         form = g.csrf_form
 
+        following_ids = [person.id for person in g.user.following]
+
         messages = (Message
                     .query
+                    .filter((Message.user_id == g.user.id) | (Message.user_id.in_(following_ids)))
                     .order_by(Message.timestamp.desc())
                     .limit(100)
                     .all())
