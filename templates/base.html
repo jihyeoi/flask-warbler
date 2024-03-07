@@ -16,10 +16,6 @@
 
 <body class="{% block body_class %}{% endblock %}">
 
-  {% for message in get_flashed_messages() %}
-    <p>{{ message }}</p>
-  {% endfor %}
-
   <nav class="navbar navbar-expand">
     <div class="container-fluid">
 
@@ -55,7 +51,7 @@
         <li><a href="/messages/new">New Message</a></li>
         <li>
           <form>
-            {{ form.hidden_tag() }}
+            {{ g.csrf_form.hidden_tag() }}
             <button type="submit" class="btn btn-danger btn-sm" formaction="/logout" formmethod="POST">
               Logout
             </button>

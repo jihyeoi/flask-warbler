@@ -1,13 +1,13 @@
 import os
 from dotenv import load_dotenv
 
-from flask import Flask, render_template, request, flash, redirect, session, g, url_for
+from flask import Flask, render_template, request, flash, redirect, session, g
 from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 from werkzeug.exceptions import Unauthorized
 
 from forms import UserAddForm, LoginForm, MessageForm, CsrfForm, EditForm
-from models import db, connect_db, User, Message
+from models import db, connect_db, User, Message, DEFAULT_IMAGE_URL, DEFAULT_HEADER_IMAGE_URL
 
 load_dotenv()
 
@@ -17,7 +17,7 @@ app = Flask(__name__)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL']
 app.config['SQLALCHEMY_ECHO'] = False
-app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = True
+app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
 app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
 toolbar = DebugToolbarExtension(app)
 
@@ -53,7 +53,6 @@ def do_logout():
         del session[CURR_USER_KEY]
 
 
-
 @app.route('/signup', methods=["GET", "POST"])
 def signup():
     """Handle user signup.
@@ -78,7 +77,7 @@ def signup():
                 email=form.email.data,
                 image_url=form.image_url.data or User.image_url.default.arg,
             )
-            #TODO: db.session.add(user)?
+            # TODO: db.session.add(user)?
             db.session.commit()
 
         except IntegrityError:
@@ -169,27 +168,25 @@ def show_user(user_id):
 def show_following(user_id):
     """Show list of people this user is following."""
 
-    # if not logged in or attempting to view someone else's follower list,
-    # redirect and flash unauthorized
-    if not g.user or user_id != g.user.id:
+    if not g.user:
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
     user = User.query.get_or_404(user_id)
 
-    return render_template('users/following.html', user=user, form=g.csrf_form)
+    return render_template('users/following.html', user=user)
 
 
 @app.get('/users/<int:user_id>/followers')
 def show_followers(user_id):
     """Show list of followers of this user."""
 
-    if not g.user or user_id != g.user.id:
+    if not g.user:
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
     user = User.query.get_or_404(user_id)
-    return render_template('users/followers.html', user=user, form=g.csrf_form)
+    return render_template('users/followers.html', user=user)
 
 
 @app.post('/users/follow/<int:follow_id>')
@@ -203,8 +200,9 @@ def start_following(follow_id):
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
-    form=g.csrf_form
+    form = g.csrf_form
 
+    #TODO: refactor all the raise errors
     if form.validate_on_submit():
         followed_user = User.query.get_or_404(follow_id)
         g.user.following.append(followed_user)
@@ -214,6 +212,7 @@ def start_following(follow_id):
 
     else:
         raise Unauthorized()
+
 
 @app.post('/users/stop-following/<int:follow_id>')
 def stop_following(follow_id):
@@ -226,7 +225,8 @@ def stop_following(follow_id):
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
-    form=g.csrf_form
+    form = g.csrf_form
+    #TODO: refactor all the raise errors
 
     if form.validate_on_submit():
         followed_user = User.query.get_or_404(follow_id)
@@ -253,13 +253,17 @@ def profile():
     if form.validate_on_submit():
         user.username = form.username.data
         user.email = form.email.data
-        user.image_url = form.image_url.data
-        user.header_image_url = form.header_image_url.data
-        user.bio = form.bio.data
+        user.image_url = form.image_url.data or DEFAULT_IMAGE_URL
+        user.header_image_url = form.header_image_url.data or DEFAULT_HEADER_IMAGE_URL
+        user.bio = form.bio.data or " "
         password = form.password.data
 
         edit_user = User.authenticate(user.username, password)
-        db.session.commit()
+
+        try:
+            db.session.commit()
+        except IntegrityError:
+            form.username.errors = ["Username Taken"]
 
         if edit_user:
             return redirect(f"/users/{user.id}")
@@ -276,24 +280,21 @@ def delete_user():
     Redirect to signup page.
     """
 
-    form = g.csrf_form
-
-    if not g.user:
+    if not g.user or not g.csrf_form.validate_on_submit():
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
-    if form.validate_on_submit():
-        user = User.query.get_or_404(g.user.id)
+    user = User.query.get_or_404(g.user.id)
 
-        db.session.delete(user)
-        db.session.commit()
+    user.query.filter(User.messages).delete()
 
-        do_logout()
+    db.session.delete(user)
+    db.session.commit()
 
-        return redirect("/signup")
+    do_logout()
 
-    else:
-        raise Unauthorized()
+    return redirect("/signup")
+
 
 
 ##############################################################################
@@ -347,9 +348,7 @@ def delete_message(message_id):
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
-    form = g.csrf_form
-
-    if form.validate_on_submit():
+    if g.csrf_form.validate_on_submit():
         db.session.delete(msg)
         db.session.commit()
 
@@ -372,7 +371,6 @@ def homepage():
     """
 
     if g.user:
-        form = g.csrf_form
 
         following_ids = [person.id for person in g.user.following]
 
@@ -384,11 +382,9 @@ def homepage():
                     .all())
 
         return render_template('home.html',
-                               messages=messages,
-                               form=form)
+                               messages=messages)
 
-    else:
-        return render_template('home-anon.html')
+    return render_template('home-anon.html')
 
 
 @app.after_request
