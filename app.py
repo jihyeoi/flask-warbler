@@ -371,6 +371,30 @@ def homepage():
     return render_template('home-anon.html')
 
 
+@app.post("/favorite")
+def handle_favorites():
+    """handle the favoriting/unfavoriting of a function"""
+
+    if not g.user or not g.csrf.form.validate_on_submit():
+        return redirect #redirect to whatever page they clicked from
+
+    if: # message is not my warble or not in my likes
+        g.user.liked_message.append() # add message id)
+        db.session.commit()
+        # update favorites icon to filled star
+        # https://icons.getbootstrap.com/icons/star-fill/
+    else:
+        g.user.liked_message.pop() # add message id)
+        db.session.commit()
+        # update favorites icon to empty star
+        # https://icons.getbootstrap.com/icons/star/
+
+    return redirect #redirect to whatever page they clicked from
+
+
+
+
+
 @app.after_request
 def add_header(response):
     """Add non-caching headers on every request."""

@@ -89,6 +89,8 @@ class User(db.Model):
     )
 
     messages = db.relationship('Message', backref="user")
+    # backref lets us do user.messages (list of messages) AND message.user
+    # no secondary = no thru table
 
     followers = db.relationship(
         "User",
@@ -97,6 +99,12 @@ class User(db.Model):
         secondaryjoin=(Follow.user_following_id == id),
         backref="following",
     )
+
+    liked_messages = db.relationship('Message', secondary="favorite_messages")
+    # first one - what instances do i want to return (class name, single quotes)
+    # secondary is the thru table (name of table)
+    # its in users, when i get user instance, i can access this
+    # user.liked_messsages --> list of messages we get through favorite_messages table
 
     def __repr__(self):
         return f"<User #{self.id}: {self.username}, {self.email}>"
@@ -182,6 +190,27 @@ class Message(db.Model):
         db.Integer,
         db.ForeignKey('users.id', ondelete='CASCADE'),
         nullable=False,
+    )
+
+
+
+class FavoriteMessage(db.Model):
+    """Favorites model"""
+
+    __tablename__ = "favorite_messages"
+
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey('users.id', ondelete='CASCADE'),
+        primary_key=True,
+        nullable=False
+    )
+
+    message_id = db.Column(
+        db.Integer,
+        db.ForeignKey('messages.id', ondelete='CASCADE'),
+        primary_key=True,
+        nullable=False
     )
 
 
