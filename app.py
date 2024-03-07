@@ -260,10 +260,13 @@ def profile():
 
         edit_user = User.authenticate(user.username, password)
 
+    #FIXME: try except block for integrity error not working - still showing traceback integrity error page upon error raising
         try:
             db.session.commit()
+
         except IntegrityError:
             form.username.errors = ["Username Taken"]
+            return render_template('/users/edit.html', user=user, form=form)
 
         if edit_user:
             return redirect(f"/users/{user.id}")
