@@ -5,6 +5,7 @@
 #    FLASK_DEBUG=False python -m unittest test_message_views.py
 
 
+from app import app, CURR_USER_KEY
 import os
 from unittest import TestCase
 
@@ -19,7 +20,6 @@ os.environ['DATABASE_URL'] = "postgresql:///warbler_test"
 
 # Now we can import app
 
-from app import app, CURR_USER_KEY
 
 app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
 
@@ -53,8 +53,9 @@ class MessageBaseViewTestCase(TestCase):
         self.u1_id = u1.id
         self.m1_id = m1.id
 
+
 class MessageAddViewTestCase(MessageBaseViewTestCase):
-    def test_add_message(self):
+    def test_add_message_logged_in(self):
         # Since we need to change the session to mimic logging in,
         # we need to use the changing-session trick:
         with app.test_client() as c:
@@ -68,3 +69,41 @@ class MessageAddViewTestCase(MessageBaseViewTestCase):
             self.assertEqual(resp.status_code, 302)
 
             Message.query.filter_by(text="Hello").one()
+
+    def test_delete_message_logged_in(self):
+        """ when logged in, if user deletes their own message, tests that it is
+         fully deleted from database; test redirect  """
+
+        with app.test_client() as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.u1_id
+
+            resp = c.post(
+                f"/messages/{self.m1_id}/delete", follow_redirects=True)
+            u1 = User.query.get(self.u1_id)
+
+            self.assertEqual(len(u1.messages), 0)
+            self.assertEqual(resp.status_code, 200)
+
+    def test_add_message_logged_out(self):
+        """ when logged out, test that user is prohibited from adding
+        a message """
+
+        with app.test_client() as c:
+            resp = c.post("/messages/new", data={"text": "Hello"})
+            # result = Message.query.filter_by(text="Hello").one_or_none()
+
+            self.assertEqual(resp.status_code, 302)
+            # self.assertIsNone(result)
+
+    # def test_delete_message_logged_out(self):
+    #     """ when logged out, check that user is prohibited from
+    #       deleting messages """
+
+    #     with app.test_client() as c:
+    #         resp = c.post(
+    #             f"/messages/{self.m1_id}/delete", follow_redirects=True)
+    #         u1 = User.query.get(self.u1_id)
+
+    #         self.assertEqual(len(u1.messages), 0)
+    #         self.assertEqual(resp.status_code, 200)
