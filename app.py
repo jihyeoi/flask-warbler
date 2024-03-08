@@ -195,7 +195,9 @@ def show_favorite_warbles(user_id):
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
-    return render_template('users/liked_warbles.html', user=g.user)
+    user = User.query.get(user_id)
+
+    return render_template('users/liked_warbles.html', user=user)
 
 
 @app.post('/users/follow/<int:follow_id>')
@@ -285,7 +287,7 @@ def delete_user():
         return redirect("/")
 
     # cascade kicks in here so no need to delete messages separately (must have delete cascade in models though!)
-    User.query.filter_by(id = g.user.id).delete()
+    User.query.filter_by(id=g.user.id).delete()
 
     db.session.commit()
 
@@ -359,10 +361,15 @@ def delete_message(message_id):
 def handle_favorites(message_id):
     """handle the favoriting/unfavoriting of a function"""
 
+    # page = request.get(url)
+    # breakpoint()
+
     if not g.user or not g.csrf_form.validate_on_submit():
+        flash("Access unauthorized.", "danger")
         return redirect('/')
 
     msg = Message.query.get_or_404(message_id)
+    origin_url = request.form.get('origin_url')
 
     if msg not in g.user.liked_messages:
         g.user.liked_messages.append(msg)
@@ -371,9 +378,7 @@ def handle_favorites(message_id):
         g.user.liked_messages.remove(msg)
         db.session.commit()
 
-    return redirect('/')
-
-
+    return redirect(origin_url)
 
 
 ##############################################################################

@@ -59,6 +59,7 @@
                 <form method="POST"
                   action="/message/{{ msg.id }}/favorite">
                   {{ g.csrf_form.hidden_tag() }}
+                  <input type="hidden" name="origin_url" value="{{ request.url }}">
                   <button class="star-btn btn btn-link"><i class="bi bi-star{{
                     "-fill" if msg in g.user.liked_messages else ""
                   }}"></i></button>
