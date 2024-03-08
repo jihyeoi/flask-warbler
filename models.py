@@ -100,7 +100,7 @@ class User(db.Model):
         backref="following",
     )
 
-    liked_messages = db.relationship('Message', secondary="favorite_messages")
+    liked_messages = db.relationship('Message', secondary="likes")
     # first one - what instances do i want to return (class name, single quotes)
     # secondary is the thru table (name of table)
     # its in users, when i get user instance, i can access this
@@ -193,11 +193,10 @@ class Message(db.Model):
     )
 
 
+class Like(db.Model):
+    """Like model"""
 
-class FavoriteMessage(db.Model):
-    """Favorites model"""
-
-    __tablename__ = "favorite_messages"
+    __tablename__ = "likes"
 
     user_id = db.Column(
         db.Integer,
