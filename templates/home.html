@@ -56,13 +56,13 @@
               <a href="/users/{{ msg.user.id }}">@{{ msg.user.username }}</a>
               <span class="text-muted">{{ msg.timestamp.strftime('%d %B %Y') }}</span>
               {% if g.user.id != msg.user.id %}
-                <span><form method="POST"
+                <form method="POST"
                   action="/message/{{ msg.id }}/favorite">
                   {{ g.csrf_form.hidden_tag() }}
                   <button class="star-btn btn btn-link"><i class="bi bi-star{{
                     "-fill" if msg in g.user.liked_messages else ""
                   }}"></i></button>
-                </form></span>
+                </form>
               {% endif %}
               <p>{{ msg.text }}</p>
             </div>
