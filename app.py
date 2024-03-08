@@ -348,22 +348,19 @@ def delete_message(message_id):
 def handle_favorites(message_id):
     """handle the favoriting/unfavoriting of a function"""
 
-    if not g.user or not g.csrf.form.validate_on_submit():
-        return redirect #TODO: redirect to whatever page they clicked from
+    if not g.user or not g.csrf_form.validate_on_submit():
+        return redirect('/')
 
     msg = Message.query.get_or_404(message_id)
 
     if msg not in g.user.liked_messages:
-        g.user.liked_message.append(msg)
+        g.user.liked_messages.append(msg)
         db.session.commit()
-        # TODO: update favorites icon to filled star using bSoup toggle bi-star / bi-star-fill
     else:
-        g.user.liked_message.pop(msg)
+        g.user.liked_messages.remove(msg)
         db.session.commit()
-        # TODO: update favorites icon to filled star using bSoup toggle bi-star / bi-star-fill
 
-    return redirect #TODO: redirect to whatever page they clicked from
-
+    return redirect('/')
 
 ##############################################################################
 # Homepage and error pages
