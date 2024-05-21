@@ -245,6 +245,7 @@ def profile():
     """Update profile for current user."""
 
     form = EditForm(obj=g.user)
+    print(form)
 
     if not g.user:
         flash("Access unauthorized.", "danger")
